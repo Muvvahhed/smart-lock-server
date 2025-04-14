@@ -9,6 +9,7 @@ import connectDataSource from './config/database'
 import morgan from 'morgan'
 import routes from './routes'
 import { UserModel } from './models/user.model'
+import { DeviceModel } from './models/device-status.model'
 
 const PORT = process.env.PORT || 8080
 const app: Application = express()
@@ -27,20 +28,19 @@ app.use(routes)
 
 const pendingEnrollments = new Map()
 
-app.route('/api/enroll-fingerprint').put(async (req, res) => {
+app.route('/api/enroll').put(async (req, res) => {
 	try {
-		const { studentId } = req.body
-		if (!studentId) {
-			return res.status(400).json({ message: 'Student ID is required' })
+		const { userId } = req.body
+		if (!userId) {
+			return res.status(400).json({ message: 'user ID is required' })
 		}
-		const student = await StudentModel.findById(studentId)
-		if (!student) {
+		const user = await UserModel.findById(userId)
+		if (!user) {
 			return res.status(404).json({ message: 'Student not found' })
 		}
 
-		const fingerPrint = student.fingerprintId
+		const fingerPrint = user.biometricId
 
-		console.log('enroll mode')
 		wss.clients.forEach((client) => {
 			if (client.readyState === WebSocket.OPEN) {
 				console.log('enroll mode active')
@@ -51,9 +51,8 @@ app.route('/api/enroll-fingerprint').put(async (req, res) => {
 		pendingEnrollments.set(fingerPrint, async (success: boolean) => {
 			if (success) {
 				logger.info('Enrollment successful')
-				// Update the student's fingerprint registration status
-				student.isFingerprintRegistered = true
-				await student.save()
+				user.biometricEnrolled = true
+				await user.save()
 				res
 					.status(200)
 					.json({ success: true, message: 'Enrollment successful' })
@@ -106,27 +105,16 @@ wss.on('connection', (ws, req) => {
 					}
 					break
 
-				case 'verifyAck':
-					logger.info({ verifyAck: data })
-					if (attendanceActive) {
-						sendMessageToClient('web', JSON.stringify(data))
-						sendMessageToClient('esp32', 'verify')
-					} else {
-						logger.info('Attendance mode not enabled')
+				case 'unlock':
+					const device = await DeviceModel.findOne({
+						deviceId: process.env.DEVICE_ID,
+					})
+					if (device) {
+						device.lockState = 'unlocked'
+						await device.save()
+						logger.info('Device unlocked')
+						sendMessageToClient('esp32', 'unlock')
 					}
-					break
-
-				case 'takeAttendance':
-					logger.info('Attendance mode started')
-					attendanceActive = true
-					sendMessageToClient('esp32', 'verify')
-					break
-
-				case 'stopAttendance':
-					logger.info('Attendance mode stopped')
-					// sendMessageToClient('react', 'stopAttendance')
-					attendanceActive = false
-
 					break
 
 				default:
@@ -164,13 +152,43 @@ function sendMessageToClient(clientType: string, message: string) {
 	console.error(`Client of type ${clientType} not found`)
 }
 
-// server.on('upgrade', (request, socket, head) => {
-// 	wss.handleUpgrade(request, socket, head, (ws) => {
-// 		wss.emit('connection', ws, request)
-// 	})
-// })
-
 server.listen(PORT, async () => {
 	logger.info(`Server running on port ${PORT}`)
 	await connectDataSource()
+	try {
+		const admin = await UserModel.findOne({
+			role: 'admin',
+		})
+
+		if (!admin) {
+			await UserModel.create({
+				email: process.env.ADMIN_EMAIL,
+				deviceId: process.env.DEVICE_ID,
+				password: process.env.ADMIN_PASSWORD,
+				fullName: 'Khadijah Ahmed',
+				role: 'admin',
+				pin: '1234',
+			})
+			logger.info('Admin user created')
+		} else {
+			logger.info('Admin user already exists')
+		}
+
+		const device = await DeviceModel.findOne({
+			deviceId: process.env.DEVICE_ID,
+		})
+
+		if (!device) {
+			await DeviceModel.create({
+				deviceId: process.env.DEVICE_ID,
+				lockState: 'locked',
+				batteryLevel: 100,
+			})
+			logger.info('Device created')
+		} else {
+			logger.info('Device already exists')
+		}
+	} catch (err) {
+		logger.error(err)
+	}
 })

@@ -10,6 +10,7 @@ import {
 } from '@typegoose/typegoose'
 import argon2 from 'argon2'
 import { Response } from 'express'
+import { number } from 'zod'
 
 @modelOptions({
 	schemaOptions: { timestamps: true },
@@ -19,26 +20,51 @@ import { Response } from 'express'
 	if (this.isModified('password')) {
 		this.password = await argon2.hash(this.password)
 	}
+
+	if (!this.biometricId) {
+		// Find the highest fingerprintId and increment by 1
+		const highestUser = await UserModel.findOne(
+			{},
+			{},
+			{ sort: { fingerprintId: -1 } }
+		)
+		this.biometricId = highestUser ? highestUser.biometricId + 1 : 1
+	}
 	next()
 })
 export class User {
 	@prop({ required: true, unique: true })
-	username!: string
+	email!: string
 
 	@prop({ required: true })
+	deviceId!: string
+
+	@prop({})
 	password!: string
 
-	@prop({ required: true })
-	firstName!: string
+	@prop({})
+	pin!: string
 
 	@prop({ required: true })
-	lastName!: string
+	fullName!: string
 
 	@prop({
-		default: 'lecturer',
-		enum: ['admin', 'student', 'lecturer'],
+		default: 'user',
+		enum: ['admin', 'user'],
 	})
-	role!: 'admin' | 'student' | 'lecturer'
+	role!: 'admin' | 'user'
+
+	@prop({ default: false })
+	biometricEnrolled!: boolean
+
+	@prop({ type: Number })
+	biometricId!: number
+
+	@prop({ default: false })
+	isActive!: boolean
+
+	@prop({})
+	lastLogin!: Date
 
 	@prop({ default: new Date() })
 	createdAt!: Date

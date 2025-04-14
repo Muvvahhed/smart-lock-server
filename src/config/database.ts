@@ -10,7 +10,7 @@ let retryCount = 0
 async function connectDataSource(): Promise<void> {
 	try {
 		const conn = await mongoose.connect(dbUri, {
-			dbName: 'biotracker',
+			dbName: 'smartlock',
 			maxPoolSize: 10,
 			serverSelectionTimeoutMS: 20000,
 			socketTimeoutMS: 40000,
