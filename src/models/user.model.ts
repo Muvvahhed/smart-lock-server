@@ -60,7 +60,7 @@ export class User {
 	@prop({ type: Number })
 	biometricId!: number
 
-	@prop({ default: false })
+	@prop({ default: true })
 	isActive!: boolean
 
 	@prop({})

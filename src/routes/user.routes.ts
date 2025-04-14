@@ -7,6 +7,19 @@ import logger from '../utils/logger'
 
 const router = Router()
 
+router.get('/', async (req: Request, res: Response) => {
+	try {
+		const users = await UserModel.find({}).select('-__v')
+		return res.status(200).json({
+			message: 'Users fetched successfully',
+			data: users,
+		})
+	} catch (error: any) {
+		logger.error(error)
+		return res.status(500).json({ message: 'Something went wrong' })
+	}
+})
+
 const registerSchema = z.object({
 	email: z.string(),
 	pincode: z.string(),
@@ -107,9 +120,10 @@ router.post(
 	}
 )
 
-router.delete('/:ïd', async (req: Request, res: Response) => {
+router.delete('/:userId', async (req: Request, res: Response) => {
 	try {
 		const { userId } = req.params
+		logger.info(userId)
 
 		const user = await UserModel.findByIdAndDelete(userId)
 

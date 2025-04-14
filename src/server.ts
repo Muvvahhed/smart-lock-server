@@ -28,44 +28,6 @@ app.use(routes)
 
 const pendingEnrollments = new Map()
 
-app.route('/api/enroll').put(async (req, res) => {
-	try {
-		const { userId } = req.body
-		if (!userId) {
-			return res.status(400).json({ message: 'user ID is required' })
-		}
-		const user = await UserModel.findById(userId)
-		if (!user) {
-			return res.status(404).json({ message: 'Student not found' })
-		}
-
-		const fingerPrint = user.biometricId
-
-		wss.clients.forEach((client) => {
-			if (client.readyState === WebSocket.OPEN) {
-				console.log('enroll mode active')
-				client.send(`scan:${fingerPrint}`)
-			}
-		})
-
-		pendingEnrollments.set(fingerPrint, async (success: boolean) => {
-			if (success) {
-				logger.info('Enrollment successful')
-				user.biometricEnrolled = true
-				await user.save()
-				res
-					.status(200)
-					.json({ success: true, message: 'Enrollment successful' })
-			} else {
-				res.status(500).json({ success: false, message: 'Enrollment failed' })
-			}
-		})
-	} catch (err) {
-		console.log(err)
-		return res.status(500).json({ message: 'Enrollment failed' })
-	}
-})
-
 const server = http.createServer(app)
 const wss = new WebSocketServer({ server })
 const clients = new Map()
@@ -151,6 +113,97 @@ function sendMessageToClient(clientType: string, message: string) {
 	}
 	console.error(`Client of type ${clientType} not found`)
 }
+
+app.route('/enroll').put(async (req, res) => {
+	try {
+		const { userId } = req.body
+		if (!userId) {
+			return res.status(400).json({ message: 'user ID is required' })
+		}
+		const user = await UserModel.findById(userId)
+		if (!user) {
+			return res.status(404).json({ message: 'Student not found' })
+		}
+
+		const fingerPrint = user.biometricId
+
+		wss.clients.forEach((client) => {
+			if (client.readyState === WebSocket.OPEN) {
+				console.log('enroll mode active')
+				client.send(`scan:${fingerPrint}`)
+			}
+		})
+
+		pendingEnrollments.set(fingerPrint, async (success: boolean) => {
+			if (success) {
+				logger.info('Enrollment successful')
+				user.biometricEnrolled = true
+				await user.save()
+				res
+					.status(200)
+					.json({ success: true, message: 'Enrollment successful' })
+			} else {
+				res.status(500).json({ success: false, message: 'Enrollment failed' })
+			}
+		})
+	} catch (err) {
+		console.log(err)
+		return res.status(500).json({ message: 'Enrollment failed' })
+	}
+})
+
+app.route('/door-control').put(async (req, res) => {
+	try {
+		const { action } = req.body
+		if (!action) {
+			return res.status(400).json({ message: 'Action is required' })
+		}
+
+		// Find the device in the database
+		const device = await DeviceModel.findOne({
+			deviceId: process.env.DEVICE_ID,
+		})
+
+		if (!device) {
+			return res.status(404).json({ message: 'Device not found' })
+		}
+
+		if (action === 'unlock') {
+			// Update device lock state in database
+			device.lockState = 'unlocked'
+			await device.save()
+
+			// Send message to hardware clients
+			wss.clients.forEach((client) => {
+				if (client.readyState === WebSocket.OPEN) {
+					client.send('unlock')
+				}
+			})
+
+			logger.info('Door unlocked and database updated')
+			res.status(200).json({ success: true, message: 'Door unlocked' })
+		} else if (action === 'lock') {
+			// Update device lock state in database
+			device.lockState = 'locked'
+			await device.save()
+
+			// Send message to hardware clients
+			wss.clients.forEach((client) => {
+				if (client.readyState === WebSocket.OPEN) {
+					client.send('lock')
+				}
+			})
+
+			logger.info('Door locked and database updated')
+			res.status(200).json({ success: true, message: 'Door locked' })
+		} else {
+			res.status(400).json({ success: false, message: 'Invalid action' })
+		}
+	} catch (err) {
+		logger.error(err)
+		return res.status(500).json({ message: 'Door control failed' })
+	}
+})
 
 server.listen(PORT, async () => {
 	logger.info(`Server running on port ${PORT}`)
