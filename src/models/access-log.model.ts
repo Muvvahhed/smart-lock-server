@@ -17,17 +17,17 @@ import { User } from './user.model'
 	options: { allowMixed: Severity.ALLOW },
 })
 export class AccessLog {
-	@prop({ ref: () => User, required: true })
+	@prop({ ref: () => User })
 	user!: Ref<User>
 
-	@prop({ required: true, enum: ['pin', 'biometric', 'mobile'] })
+	@prop({ required: true })
 	accessMethod!: 'pin' | 'biometric' | 'mobile'
 
 	@prop({ default: false })
 	success!: boolean
 
 	@prop({})
-	notes?: string
+	action?: string
 
 	@prop({ default: new Date() })
 	createdAt!: Date

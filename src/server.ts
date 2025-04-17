@@ -8,8 +8,10 @@ import logger from './utils/logger'
 import connectDataSource from './config/database'
 import morgan from 'morgan'
 import routes from './routes'
-import { UserModel } from './models/user.model'
+import { TUser, UserModel } from './models/user.model'
 import { DeviceModel } from './models/device-status.model'
+import { AccessLogModel } from './models/access-log.model'
+import { Types } from 'mongoose'
 
 const PORT = process.env.PORT || 8080
 const app: Application = express()
@@ -67,16 +69,61 @@ wss.on('connection', (ws, req) => {
 					}
 					break
 
-				case 'unlock':
-					const device = await DeviceModel.findOne({
-						deviceId: process.env.DEVICE_ID,
-					})
-					if (device) {
-						device.lockState = 'unlocked'
-						await device.save()
-						logger.info('Device unlocked')
-						sendMessageToClient('esp32', 'unlock')
+				case 'unlocked':
+					await DeviceModel.findOneAndUpdate(
+						{
+							deviceId: process.env.DEVICE_ID,
+						},
+						{
+							lockState: 'unlocked',
+						},
+						{
+							new: true,
+						}
+					)
+
+					logger.info('Device unlocked')
+					sendMessageToClient('web', 'unlocked')
+					let user: TUser | null = null
+					if (data.source !== 'mobile' && data.id) {
+						user = await UserModel.findOne({
+							biometricId: data.id,
+						})
 					}
+					await AccessLogModel.create({
+						success: true,
+						accessMethod: data.source,
+						action: 'door unlocked',
+						user:
+							data.source === 'mobile'
+								? new Types.ObjectId('67fbd731656de6e6cec336cd')
+								: user?._id,
+					})
+					break
+				case 'locked':
+					await DeviceModel.findOneAndUpdate(
+						{
+							deviceId: process.env.DEVICE_ID,
+						},
+						{
+							lockState: 'locked',
+						},
+						{
+							new: true,
+						}
+					)
+
+					logger.info('Device locked')
+					sendMessageToClient('web', 'locked')
+					break
+
+				case 'failed':
+					await AccessLogModel.create({
+						success: false,
+						accessMethod: data.source,
+						action: 'failed attempt',
+					})
+					logger.info('Failed access attempt')
 					break
 
 				default:
