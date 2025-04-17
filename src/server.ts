@@ -56,6 +56,7 @@ wss.on('connection', (ws, req) => {
 		if (Buffer.isBuffer(message)) {
 			const messageString = message.toString('utf8')
 			const data = JSON.parse(messageString)
+			logger.info('Received message from ESP32:', data)
 			switch (data.action) {
 				case 'checkHardwareStatus':
 					ws.send(JSON.stringify({ action: 'hardwareStatus', hardwareActive }))
@@ -100,6 +101,7 @@ wss.on('connection', (ws, req) => {
 								: user?._id,
 					})
 					break
+
 				case 'locked':
 					await DeviceModel.findOneAndUpdate(
 						{
