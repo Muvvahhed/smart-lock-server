@@ -56,7 +56,7 @@ wss.on('connection', (ws, req) => {
 		if (Buffer.isBuffer(message)) {
 			const messageString = message.toString('utf8')
 			const data = JSON.parse(messageString)
-			logger.info('Received message from ESP32:', data)
+			logger.info('Received message from ESP32:', messageString)
 			switch (data.action) {
 				case 'checkHardwareStatus':
 					ws.send(JSON.stringify({ action: 'hardwareStatus', hardwareActive }))
