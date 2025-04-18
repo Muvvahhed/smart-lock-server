@@ -4,6 +4,7 @@ import validate from '../middlewares/validate.middleware'
 import { UserModel } from '../models'
 import { signJwt } from '../utils/jwt'
 import logger from '../utils/logger'
+import { wss } from '../server'
 
 const router = Router()
 
@@ -48,12 +49,19 @@ router.post(
 				fullName,
 				pin: pincode,
 				deviceId: process.env.DEVICE_ID,
+				biometricId: (await UserModel.countDocuments()) + 1,
 			})
 
 			const token = signJwt({
 				id: user._id,
 				email: user.email,
 				role: user.role,
+			})
+
+			wss.clients.forEach((client) => {
+				if (client.readyState === WebSocket.OPEN) {
+					client.send(`addUser:${user.biometricId}:${user.pin}`)
+				}
 			})
 
 			return res.status(201).json({

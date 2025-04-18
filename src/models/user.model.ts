@@ -21,15 +21,6 @@ import { number } from 'zod'
 		this.password = await argon2.hash(this.password)
 	}
 
-	if (!this.biometricId) {
-		// Find the highest fingerprintId and increment by 1
-		const highestUser = await UserModel.findOne(
-			{},
-			{},
-			{ sort: { fingerprintId: -1 } }
-		)
-		this.biometricId = highestUser ? highestUser.biometricId + 1 : 1
-	}
 	next()
 })
 export class User {

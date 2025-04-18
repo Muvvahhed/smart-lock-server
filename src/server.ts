@@ -31,7 +31,7 @@ app.use(routes)
 const pendingEnrollments = new Map()
 
 const server = http.createServer(app)
-const wss = new WebSocketServer({ server })
+export const wss = new WebSocketServer({ server })
 const clients = new Map()
 let hardwareActive = false
 let attendanceActive = false
