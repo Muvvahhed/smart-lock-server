@@ -70,13 +70,13 @@ wss.on('connection', (ws, req) => {
 					}
 					break
 
-				case 'unlocked':
+				case 'locked':
 					await DeviceModel.findOneAndUpdate(
 						{
 							deviceId: process.env.DEVICE_ID,
 						},
 						{
-							lockState: 'unlocked',
+							lockState: 'locked',
 						},
 						{
 							new: true,
@@ -102,22 +102,22 @@ wss.on('connection', (ws, req) => {
 					})
 					break
 
-				case 'locked':
-					await DeviceModel.findOneAndUpdate(
-						{
-							deviceId: process.env.DEVICE_ID,
-						},
-						{
-							lockState: 'locked',
-						},
-						{
-							new: true,
-						}
-					)
+				// case 'locked':
+				// 	await DeviceModel.findOneAndUpdate(
+				// 		{
+				// 			deviceId: process.env.DEVICE_ID,
+				// 		},
+				// 		{
+				// 			lockState: 'locked',
+				// 		},
+				// 		{
+				// 			new: true,
+				// 		}
+				// 	)
 
-					logger.info('Device locked')
-					sendMessageToClient('web', 'locked')
-					break
+				// 	logger.info('Device locked')
+				// 	sendMessageToClient('web', 'locked')
+				// 	break
 
 				case 'failed':
 					await AccessLogModel.create({
