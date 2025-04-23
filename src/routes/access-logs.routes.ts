@@ -6,10 +6,7 @@ const router = Router()
 router.get('/fetch', async (req: Request, res: Response) => {
 	try {
 		const accessLogs = await AccessLogModel.find({})
-			.populate({
-				path: 'user',
-				select: 'fullName email',
-			})
+			.populate('user', 'fullName email')
 			.sort({ createdAt: -1 })
 
 		return res.status(200).json({

@@ -20,7 +20,6 @@ router.get('/summary', async (req: Request, res: Response) => {
 		// Get recent logs (limit to 5)
 		const recentLogs = await AccessLogModel.find()
 			.sort({ createdAt: -1 })
-			.limit(5)
 			.populate('user', 'fullName email')
 
 		// Get user count

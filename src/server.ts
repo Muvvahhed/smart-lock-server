@@ -59,6 +59,7 @@ wss.on('connection', (ws, req) => {
 			logger.info('Received message from ESP32:', messageString)
 			switch (data.action) {
 				case 'checkHardwareStatus':
+					logger.info('Checking hardware status')
 					ws.send(JSON.stringify({ action: 'hardwareStatus', hardwareActive }))
 					break
 
@@ -83,13 +84,21 @@ wss.on('connection', (ws, req) => {
 						}
 					)
 
-					logger.info('Device unlocked')
-					sendMessageToClient('web', 'unlocked')
+					sendMessageToClient('web', JSON.stringify({ action: 'doorLocked' }))
+
 					let user: TUser | null = null
 					if (data.source !== 'mobile' && data.id) {
-						user = await UserModel.findOne({
-							biometricId: data.id,
-						})
+						user = await UserModel.findOneAndUpdate(
+							{
+								biometricId: data.id,
+							},
+							{
+								lastLogin: new Date(),
+							},
+							{
+								new: true,
+							}
+						)
 					}
 					await AccessLogModel.create({
 						success: true,
@@ -100,6 +109,8 @@ wss.on('connection', (ws, req) => {
 								? new Types.ObjectId('67fbd731656de6e6cec336cd')
 								: user?._id,
 					})
+
+					sendMessageToClient('web', JSON.stringify({ action: 'update' }))
 					break
 
 				// case 'locked':
@@ -125,6 +136,7 @@ wss.on('connection', (ws, req) => {
 						accessMethod: data.source,
 						action: 'failed attempt',
 					})
+					sendMessageToClient('web', JSON.stringify({ action: 'update' }))
 					logger.info('Failed access attempt')
 					break
 
@@ -141,6 +153,10 @@ wss.on('connection', (ws, req) => {
 		const disconnectedClientType = clients.get(ws)
 		if (disconnectedClientType === 'esp32') {
 			hardwareActive = false
+			sendMessageToClient(
+				'web',
+				JSON.stringify({ action: 'hardwareStatus', hardwareActive })
+			)
 		}
 		clients.delete(ws)
 		logger.info(

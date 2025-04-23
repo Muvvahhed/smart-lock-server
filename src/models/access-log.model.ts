@@ -29,10 +29,11 @@ export class AccessLog {
 	@prop({})
 	action?: string
 
-	@prop({ default: new Date() })
+	// Remove explicit defaults and let timestamps: true handle these
+	@prop()
 	createdAt!: Date
 
-	@prop({ default: new Date() })
+	@prop()
 	updatedAt!: Date
 }
 export const AccessLogModel = getModelForClass(AccessLog)

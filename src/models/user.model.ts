@@ -57,8 +57,11 @@ export class User {
 	@prop({})
 	lastLogin!: Date
 
-	@prop({ default: new Date() })
-	createdAt!: Date
+	@prop({})
+	otp!: string
+
+	@prop({})
+	otpExpiresAt!: Date
 
 	async verifyPassword(password: string) {
 		return argon2.verify(this.password, password)
