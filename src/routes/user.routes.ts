@@ -5,6 +5,8 @@ import { UserModel } from '../models'
 import { signJwt } from '../utils/jwt'
 import logger from '../utils/logger'
 import { wss } from '../server'
+import nodemailer from 'nodemailer'
+import crypto from 'crypto'
 
 const router = Router()
 
@@ -108,18 +110,33 @@ router.post(
 				return res.status(401).json({ message: 'Invalid credentials' })
 			}
 
-			const token = signJwt({
-				id: user._id,
-				email: user.email,
-				role: user.role,
+			// Generate OTP
+			const otp = crypto.randomInt(100000, 999999).toString()
+			const otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000) // OTP valid for 10 minutes
+
+			user.otp = otp
+			user.otpExpiresAt = otpExpiresAt
+			await user.save()
+
+			// Send OTP via email
+			const transporter = nodemailer.createTransport({
+				host: process.env.SMTP_SERVER,
+				port: Number(process.env.SMTP_PORT),
+				auth: {
+					user: process.env.SMTP_USERNAME,
+					pass: process.env.SMTP_PASSWORD,
+				},
+			})
+
+			await transporter.sendMail({
+				from: process.env.SENDER_EMAIL,
+				to: 'khadijahtouu@gmail.com',
+				subject: 'Your OTP Code',
+				text: `Your OTP code is ${otp}. It will expire in 10 minutes.`,
 			})
 
 			return res.status(200).json({
-				message: 'Login successful',
-				data: {
-					token,
-					user: user,
-				},
+				message: 'OTP sent to your email. Please verify to complete login.',
 			})
 		} catch (error: any) {
 			logger.error(error)
@@ -127,6 +144,48 @@ router.post(
 		}
 	}
 )
+
+router.post('/verify-otp', async (req: Request, res: Response) => {
+	try {
+		const { email, otp } = req.body
+
+		const user = await UserModel.findOne({
+			role: 'admin',
+			email: { $regex: new RegExp(`^${email.trim()}$`, 'i') },
+		})
+
+		if (
+			!user ||
+			user.otp !== otp ||
+			!user.otpExpiresAt ||
+			user.otpExpiresAt < new Date()
+		) {
+			return res.status(400).json({ message: 'Invalid or expired OTP' })
+		}
+
+		// Clear OTP fields after successful verification
+		user.otp = undefined
+		user.otpExpiresAt = undefined
+		await user.save()
+
+		const token = signJwt({
+			id: user._id,
+			email: user.email,
+			role: user.role,
+		})
+
+		return res.status(200).json({
+			message: 'Login successful',
+			data: {
+				token,
+				user,
+			},
+		})
+	} catch (error: any) {
+		logger.error(error)
+		return res.status(500).json({ message: 'Something went wrong' })
+	}
+})
 
 router.delete('/:userId', async (req: Request, res: Response) => {
 	try {

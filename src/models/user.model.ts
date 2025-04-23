@@ -57,11 +57,11 @@ export class User {
 	@prop({})
 	lastLogin!: Date
 
-	@prop({})
-	otp!: string
+	@prop({ required: false, type: String })
+	otp!: string | undefined
 
-	@prop({})
-	otpExpiresAt!: Date
+	@prop({ required: false, type: Date })
+	otpExpiresAt!: Date | undefined
 
 	async verifyPassword(password: string) {
 		return argon2.verify(this.password, password)
